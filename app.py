@@ -12,6 +12,22 @@ from torch import nn
 from transformers import BertTokenizer, BertModel
 import demoji
 
+import gdown
+import os
+
+# Download model from Google Drive if not present
+def download_model():
+    model_path = 'bert_model.pth'
+    if not os.path.exists(model_path):
+        print("Downloading model from Google Drive...")
+        url = 'https://drive.google.com/uc?export=download&id=1CuBystK6O3PPB91GASoTb--B-wQDJB4W'
+        gdown.download(url, model_path, quiet=False)
+        print("Model downloaded successfully!")
+    return model_path
+
+# Call this function before loading the model
+download_model()
+
 # Initialize session state
 if 'logged_in' not in st.session_state:
     st.session_state['logged_in'] = False
