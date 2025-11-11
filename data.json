@@ -1,0 +1,11 @@
+{
+    "users": [
+        {
+            "name": "user",
+            "email": "user@gmail.com",
+            "age": 23,
+            "sex": "Female",
+            "password": "1234"
+        }
+    ]
+}
