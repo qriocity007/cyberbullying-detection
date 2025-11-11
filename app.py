@@ -3,6 +3,7 @@ import json
 import os
 import re
 import string
+import nltk
 from nltk.corpus import stopwords
 from nltk import pos_tag
 from nltk.tokenize import word_tokenize
@@ -11,9 +12,13 @@ import torch
 from torch import nn
 from transformers import BertTokenizer, BertModel
 import demoji
-
 import gdown
-import os
+
+# Download required NLTK data
+nltk.download('wordnet', quiet=True)
+nltk.download('stopwords', quiet=True)
+nltk.download('punkt_tab', quiet=True)
+nltk.download('averaged_perceptron_tagger_eng', quiet=True)
 
 # Download model from Google Drive if not present
 def download_model():
@@ -92,6 +97,16 @@ class BERTClassifier(nn.Module):
         x = self.dropout(pooled_output)
         logits = self.fc(x)
         return logits
+
+# Load model and tokenizer ONCE at startup using cache
+@st.cache_resource
+def load_model_and_tokenizer():
+    """Load the model and tokenizer once and cache them"""
+    tokenizer = BertTokenizer.from_pretrained("tokenizer_dir")
+    model = BERTClassifier(bert_model_name='bert-base-uncased', num_classes=6)
+    model.load_state_dict(torch.load('bert_model.pth', map_location=torch.device('cpu')))
+    model.eval()
+    return tokenizer, model
 
 def predict_single_text(text, tokenizer, model):
     classes = ['age', 'ethnicity', 'gender', 'not_cyberbullying', 'other_cyberbullying', 'religion']
@@ -233,14 +248,9 @@ def render_dashboard(user_info):
     except Exception as e:
         st.error(f"Error rendering dashboard: {e}")
 
-def cyberbullying_identification():
+def cyberbullying_identification(tokenizer, model):
     if st.session_state['logged_in']:
         st.title("Cyber Bullying Identification")
-
-        # Load tokenizer and model (make sure paths are correct)
-        load_tokenizer = BertTokenizer.from_pretrained("tokenizer_dir")
-        loaded_model = BERTClassifier(bert_model_name='bert-base-uncased', num_classes=6)
-        loaded_model.load_state_dict(torch.load('bert_model.pth', map_location=torch.device('cpu')))
 
         choice = st.radio("Select the type of content", ("Image", "Text"))
         
@@ -262,7 +272,7 @@ def cyberbullying_identification():
                     emojis_description = ' '.join(demoji.findall(' '.join(emojis)).values()) if emojis else ''
                     final_text = text + ' ' + emojis_description
                     
-                    prediction = predict_single_text(text, load_tokenizer, loaded_model)
+                    prediction = predict_single_text(text, tokenizer, model)
                     
                     if prediction.lower() == "not_cyberbullying":
                         st.markdown("<div style='color:green; font-size:20px;'>It is not a CyberBullying</div>", unsafe_allow_html=True)
@@ -281,7 +291,7 @@ def cyberbullying_identification():
                 emojis_description = ' '.join(demoji.findall(' '.join(emojis)).values()) if emojis else ''
                 final_text = text + ' ' + emojis_description
                 
-                prediction = predict_single_text(text, load_tokenizer, loaded_model)
+                prediction = predict_single_text(text, tokenizer, model)
                 
                 if prediction.lower() == "not_cyberbullying":
                     st.markdown("<div style='color:green; font-size:20px;'>It is not a CyberBullying</div>", unsafe_allow_html=True)
@@ -291,6 +301,9 @@ def cyberbullying_identification():
         st.warning("Please login/signup to use the app!")
 
 def main():
+    # Load model and tokenizer once at startup
+    tokenizer, model = load_model_and_tokenizer()
+    
     # Sidebar navigation
     st.sidebar.title("Cyber Bullying Identification")
     
@@ -327,7 +340,7 @@ def main():
             st.warning("Please login/signup to view the dashboard.")
     
     elif page == "Cyber Bullying Identification":
-        cyberbullying_identification()
+        cyberbullying_identification(tokenizer, model)
 
 if __name__ == "__main__":
     initialize_database()
